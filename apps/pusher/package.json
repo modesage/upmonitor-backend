@@ -3,9 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun run index.ts",
-    "start": "bun run dist/index.js",
-    "build": "bun build ./index.ts --outdir ./dist"
+    "dev": "bun index.ts",
+    "start": "bun index.ts",
+    "build": "bun install && cd ../../packages/store && npx prisma generate && cd ../../apps/pusher"
   },
   "dependencies": {
     "store": "workspace:*",
