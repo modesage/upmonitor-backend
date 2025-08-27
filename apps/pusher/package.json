@@ -1,0 +1,20 @@
+{
+  "name": "pusher",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run index.ts",
+    "start": "bun run dist/index.js",
+    "build": "bun build ./index.ts --outdir ./dist"
+  },
+  "dependencies": {
+    "store": "workspace:*",
+    "redisstream": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
