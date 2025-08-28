@@ -8,8 +8,9 @@
     "build": "bun install && cd ../../packages/store && npx prisma generate && cd ../../apps/pusher"
   },
   "dependencies": {
-    "store": "workspace:*",
-    "redisstream": "workspace:*"
+    "express": "^5.1.0",
+    "redisstream": "workspace:*",
+    "store": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"
