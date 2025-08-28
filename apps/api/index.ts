@@ -1,11 +1,11 @@
 import dotenv from 'dotenv'
 dotenv.config({ path: '../../.env' })
 
-import jwt from "jsonwebtoken";
-import express from "express"
 import { prismaClient } from "store/client";
 import { AuthInput } from "./types";
 import { authMiddleware } from "./middleware";
+import jwt from "jsonwebtoken";
+import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt"
 
@@ -17,6 +17,15 @@ app.use(express.json());
 app.use(cors({
     origin: process.env.FRONTEND_URL!
 }));
+
+app.get("/healthcheck", (req, res) => {
+    res.status(200).json({
+        message: "Backend is running",
+        status: "ok",
+        uptime: process.uptime(),
+        timestamp: new Date().toLocaleString()
+    });
+});
 
 app.post("/user/signup", async (req, res) => {
     const data = AuthInput.safeParse(req.body);
