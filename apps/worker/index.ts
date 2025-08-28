@@ -9,13 +9,8 @@ import { prismaClient } from "store/client";
 const REGION_ID = process.env.REGION_ID!;
 const WORKER_ID = process.env.WORKER_ID!;
 
-if (!REGION_ID) {
-    throw new Error("Region ID not provided");
-}
-
-if (!WORKER_ID) {
-    throw new Error("Worker ID not provided");
-}
+if (!REGION_ID) throw new Error("Region ID not provided");
+if (!WORKER_ID) throw new Error("Worker ID not provided");
 
 async function workerInit() {
     await createConsumerGroupIfNotExists(REGION_ID);
@@ -23,65 +18,67 @@ async function workerInit() {
 }
 workerInit();
 
+const IDLE_WHEN_EMPTY = 15 * 60 * 1000; // 15 minutes
+
 async function main() {
-    while(1) {
-        // Consumes entries from the Redis Stream.
+    while (true) {
         const response = await xReadGroup(REGION_ID, WORKER_ID);
 
         if (!response) {
+            // Queue is empty → wait 15 minutes
+            console.log(`[Worker] Queue empty, sleeping for 15 min`);
+            await new Promise(r => setTimeout(r, IDLE_WHEN_EMPTY));
             continue;
         }
 
-        // fetches website status and stores it in the database
-        let promises = response.map(({message}) => fetchWebsite(message.url, message.id))
+        // Fetch website status and store in DB
+        const promises = response.map(({ message }) => fetchWebsite(message.url, message.id));
         await Promise.all(promises);
 
-        // acknowledges the messages
-        xAckBulk(REGION_ID, response.map(({id}) => id));
+        // Acknowledge messages
+        await xAckBulk(REGION_ID, response.map(({ id }) => id));
     }
 }
 
 async function fetchWebsite(url: string, websiteId: string) {
-    return new Promise<void>((resolve, reject) => {
-        const startTime = Date.now();
-        
-        axios.get(url)
-            .then(async () => { 
-                const endTime = Date.now();
-                await prismaClient.website_tick.create({
-                    data: {
-                        response_time_ms: endTime - startTime,
-                        status: "Up",
-                        region_id: REGION_ID,
-                        website_id: websiteId
-                    }
-                })
-                resolve()
-            })
-            .catch(async () => {
-                const endTime = Date.now();
-                await prismaClient.website_tick.create({
-                    data: {
-                        response_time_ms: endTime - startTime,
-                        status: "Down",
-                        region_id: REGION_ID,
-                        website_id: websiteId
-                    }
-                })
-                resolve()
-            })
-    })
+    const startTime = Date.now();
+    try {
+        await axios.get(url);
+        const endTime = Date.now();
+        await prismaClient.website_tick.create({
+            data: {
+                response_time_ms: endTime - startTime,
+                status: "Up",
+                region_id: REGION_ID,
+                website_id: websiteId
+            }
+        });
+    } catch {
+        const endTime = Date.now();
+        await prismaClient.website_tick.create({
+            data: {
+                response_time_ms: endTime - startTime,
+                status: "Down",
+                region_id: REGION_ID,
+                website_id: websiteId
+            }
+        });
+    }
 }
-
-main();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get("/healthcheck", (req, res) => {
-  res.status(200).json({ status: "ok", service: "worker", region: REGION_ID, worker: WORKER_ID, time: new Date().toLocaleString() });
+    res.status(200).json({
+        status: "ok",
+        service: "worker",
+        region: REGION_ID,
+        worker: WORKER_ID,
+        time: new Date().toLocaleString()
+    });
 });
 
 app.listen(PORT, () => {
-  console.log(`[Worker] Web server listening on port ${PORT}`);
+    console.log(`[Worker] Web server listening on port ${PORT}`);
 });
