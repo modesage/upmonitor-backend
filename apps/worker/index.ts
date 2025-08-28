@@ -1,5 +1,5 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '../../.env' })
+import dotenv from 'dotenv';
+dotenv.config({ path: '../../.env' });
 
 import axios from "axios";
 import express from "express";
@@ -12,30 +12,44 @@ const WORKER_ID = process.env.WORKER_ID!;
 if (!REGION_ID) throw new Error("Region ID not provided");
 if (!WORKER_ID) throw new Error("Worker ID not provided");
 
+const IDLE_WHEN_EMPTY = 10 * 60 * 1000; // 10 minutes
+
 async function workerInit() {
     await createConsumerGroupIfNotExists(REGION_ID);
     main(); // start worker loop
 }
 workerInit();
 
-const IDLE_WHEN_EMPTY = 15 * 60 * 1000; // 15 minutes
-
 async function main() {
     while (true) {
+        // Check if DB has websites
+        const websites = await prismaClient.website.findMany({
+            select: { id: true },
+            take: 1
+        });
+
+        if (websites.length === 0) {
+            console.log("[Worker] No websites in DB. Sleeping 10 minutes...");
+            await new Promise(r => setTimeout(r, IDLE_WHEN_EMPTY));
+            continue; // skip redis completely
+        }
+
+        // Poll Redis only if DB has websites
         const response = await xReadGroup(REGION_ID, WORKER_ID);
 
         if (!response) {
-            // Queue is empty → wait 15 minutes
-            console.log(`[Worker] Queue empty, sleeping for 15 min`);
+            console.log("[Worker] Redis queue empty. Sleeping 10 minutes...");
             await new Promise(r => setTimeout(r, IDLE_WHEN_EMPTY));
             continue;
         }
 
-        // Fetch website status and store in DB
-        const promises = response.map(({ message }) => fetchWebsite(message.url, message.id));
+        // Process jobs
+        const promises = response.map(({ message }) =>
+            fetchWebsite(message.url, message.id)
+        );
         await Promise.all(promises);
 
-        // Acknowledge messages
+        // Acknowledge jobs
         await xAckBulk(REGION_ID, response.map(({ id }) => id));
     }
 }
