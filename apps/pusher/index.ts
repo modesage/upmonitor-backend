@@ -3,14 +3,10 @@ import { xAddBulk } from "redisstream/client";
 import express from "express";
 
 // The interval at which we expect a website to be checked.
-const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
-
-// How often the pusher service runs to find jobs.
-const PUSHER_RUN_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function main() {
-  console.log("[Pusher] Searching for websites that need a health check...");
-
+  console.log("[Pusher] Checking websites...");
   // Find websites whose most recent tick is older than our check interval,
   // OR websites that have never been ticked at all.
   const tenMinutesAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
@@ -25,22 +21,19 @@ async function main() {
   });
 
   if (websitesToQueue.length === 0) {
-    console.log(
-      "[Pusher] No websites currently need to be queued. All are up-to-date."
-    );
-    return;
+    console.log("[Pusher] No websites. Sleeping 10 minutes...");
+    return setTimeout(main, 10 * 60 * 1000); // wait 10m if DB empty
   }
 
-  console.log(
-    `[Pusher] Found ${websitesToQueue.length} websites to queue. Pushing to Redis...`
-  );
+  console.log(`[Pusher] Found ${websitesToQueue.length} websites. Pushing...`);
   await xAddBulk(websitesToQueue);
-  console.log("[Pusher] Successfully pushed jobs to the stream.");
+  console.log("[Pusher] Pushed jobs.");
+
+  // When active, check more often (e.g., 30s)
+  setTimeout(main, 30 * 1000);
 }
 
-// Run the main function periodically.
-setInterval(main, PUSHER_RUN_INTERVAL_MS);
-// Run it once on startup.
+// Kick it off
 main();
 
 const app = express();
