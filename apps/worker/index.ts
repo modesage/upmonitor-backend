@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '../../.env' })
 
 import axios from "axios";
+import express from "express";
 import { createConsumerGroupIfNotExists, xAckBulk, xReadGroup } from "redisstream/client";
 import { prismaClient } from "store/client";
 
@@ -73,3 +74,14 @@ async function fetchWebsite(url: string, websiteId: string) {
 }
 
 main();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/healthcheck", (req, res) => {
+  res.status(200).json({ status: "ok", service: "worker", region: REGION_ID, worker: WORKER_ID, time: new Date().toLocaleString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`[Worker] Web server listening on port ${PORT}`);
+});

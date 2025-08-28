@@ -1,5 +1,6 @@
 import { prismaClient } from "store/client";
 import { xAddBulk } from "redisstream/client";
+import express from "express";
 
 // The interval at which we expect a website to be checked.
 const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
@@ -39,6 +40,16 @@ async function main() {
 
 // Run the main function periodically.
 setInterval(main, PUSHER_RUN_INTERVAL_MS);
-
 // Run it once on startup.
 main();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/healthcheck", (req, res) => {
+  res.status(200).json({ status: "ok", service: "pusher", time: new Date().toLocaleString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`[Pusher] Web server listening on port ${PORT}`);
+});
