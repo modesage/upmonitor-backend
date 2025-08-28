@@ -22,19 +22,7 @@ workerInit();
 
 async function main() {
     while (true) {
-        // Check if DB has websites
-        const websites = await prismaClient.website.findMany({
-            select: { id: true },
-            take: 1
-        });
-
-        if (websites.length === 0) {
-            console.log("[Worker] No websites in DB. Sleeping 10 minutes...");
-            await new Promise(r => setTimeout(r, IDLE_WHEN_EMPTY));
-            continue; // skip redis completely
-        }
-
-        // Poll Redis only if DB has websites
+        // Poll Redis
         const response = await xReadGroup(REGION_ID, WORKER_ID);
 
         if (!response) {
