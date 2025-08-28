@@ -3,10 +3,10 @@ import { xAddBulk } from "redisstream/client";
 import express from "express";
 
 // The interval at which we expect a website to be checked.
-const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
 // How often the pusher service runs to find jobs.
-const PUSHER_RUN_INTERVAL_MS = 60 * 1000; // 1 minute
+const PUSHER_RUN_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
 async function main() {
   console.log("[Pusher] Searching for websites that need a health check...");
