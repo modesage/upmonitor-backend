@@ -8,20 +8,7 @@ async function runOneCycle() {
   console.log("[Pusher] Checking websites...");
   const thirtySecondsAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
 
-  // only consider latest tick
   const websites = await prismaClient.website.findMany({
-    where: {
-      OR: [
-        { ticks: { none: {} } }, // never checked before
-        {
-          ticks: {
-            some: {
-              createdAt: { lt: thirtySecondsAgo },
-            },
-          },
-        },
-      ],
-    },
     select: {
       id: true,
       url: true,
@@ -33,12 +20,11 @@ async function runOneCycle() {
     },
   });
 
-  // Filter on latest tick manually (because Prisma "some" can still match old ticks)
-  const dueWebsites = websites.filter(
-    (w) =>
-      w.ticks.length === 0 || // never checked before
-      w.ticks[0]!.createdAt <= thirtySecondsAgo // latest check too old
-  );
+  const dueWebsites = websites.filter((w) => {
+    if (w.ticks.length === 0) return true; // never checked
+    return w.ticks[0]!.createdAt <= thirtySecondsAgo; // latest check too old
+  });
+
 
   if (dueWebsites.length === 0) {
     console.log("[Pusher] No due websites.");
