@@ -1,13 +1,18 @@
+import dotenv from 'dotenv'
+dotenv.config({ path: '../../.env' })
+
 import { prismaClient } from "store/client";
-import { xAddBulk, setEnqueueLock } from "redisstream/client"; // new helper
+import { xAddBulk, setEnqueueLock } from "redisstream/client"; // Redis helpers for queue
 import express from "express";
 
-const CHECK_INTERVAL_MS = 30 * 1000;
+const CHECK_INTERVAL_MS = 30 * 1000; // Minimum interval between checks for each website
 
 async function runOneCycle() {
   console.log("[Pusher] Checking websites...");
+
   const thirtySecondsAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
 
+  // Fetch all websites and their latest tick
   const websites = await prismaClient.website.findMany({
     select: {
       id: true,
@@ -20,18 +25,18 @@ async function runOneCycle() {
     },
   });
 
+  // Filter websites that are due for a check
   const dueWebsites = websites.filter((w) => {
     if (w.ticks.length === 0) return true; // never checked
     return w.ticks[0]!.createdAt <= thirtySecondsAgo; // latest check too old
   });
-
 
   if (dueWebsites.length === 0) {
     console.log("[Pusher] No due websites.");
     return;
   }
 
-  // Lock per website to avoid duplicate XADDs within the interval
+  // Lock each website to prevent duplicate enqueueing within the interval
   const toEnqueue: { id: string; url: string }[] = [];
   for (const w of dueWebsites) {
     const locked = await setEnqueueLock(w.id, CHECK_INTERVAL_MS);
@@ -43,24 +48,22 @@ async function runOneCycle() {
     return;
   }
 
+  // Push jobs to Redis stream for workers to process
   console.log(`[Pusher] Found ${toEnqueue.length} due websites. Pushing...`);
   await xAddBulk(toEnqueue);
   console.log("[Pusher] Pushed jobs.");
 }
 
-// Option A: stateless endpoint called by Render Cron every minute
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.get("/", (req, res) => {
-  res.status(200).send("Landing Page");
-});
-
+// Triggered by cron to enqueue due websites
 app.get("/push-cycle", async (_req, res) => {
   await runOneCycle();
   res.json({ status: "ok" });
 });
 
+// Healthcheck endpoint
 app.get("/healthcheck", (_req, res) => {
   res.status(200).json({
     status: "ok",
