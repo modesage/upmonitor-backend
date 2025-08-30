@@ -65,6 +65,10 @@ async function runOneCycle() {
 const app = express();
 const PORT = process.env.PORT_WORKER || 3002;
 
+app.get("/", (req, res) => {
+  res.status(200).send("Landing Page");
+});
+
 // Endpoint triggered by cron
 app.get("/pull-cycle", async (_req, res) => {
   const result = await runOneCycle();

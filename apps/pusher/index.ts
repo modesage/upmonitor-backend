@@ -66,6 +66,10 @@ async function runOneCycle() {
 const app = express();
 const PORT = process.env.PORT_PUSHER || 3001;
 
+app.get("/", (req, res) => {
+  res.status(200).send("Landing Page");
+});
+
 app.get("/push-cycle", async (_req, res) => {
   await runOneCycle();
   res.json({ status: "ok" });
