@@ -1,3 +1,6 @@
+import dotenv from 'dotenv'
+dotenv.config({ path: '../../.env' })
+
 import { createClient } from "redis";
 
 type WebsiteEvent = { url: string; id: string };
