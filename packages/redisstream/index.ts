@@ -1,6 +1,3 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '../../.env' })
-
 import { createClient } from "redis";
 
 type WebsiteEvent = { url: string; id: string };
@@ -72,22 +69,17 @@ export async function xReadGroup(
   consumerName: string
 ): Promise<MessageType[] | undefined> {
   const response = await client.xReadGroup(
-    consumerGroup, consumerName,{
-        key: STREAM_NAME,
-        id: '>'
-    },{
-        COUNT: 5
-    }
+    consumerGroup,
+    consumerName,
+    { key: STREAM_NAME, id: ">" },
+    { COUNT: 5}
   );
 
   if (!response) return undefined;
   // @ts-ignore
   return response[0].messages.map((msg: any) => ({
     id: msg.id,
-    message: {
-      url: msg.message.url,
-      id: msg.message.id,
-    },
+    message: { url: msg.message.url, id: msg.message.id },
   }));
 }
 
@@ -97,4 +89,25 @@ export async function xAckBulk(consumerGroup: string, eventIds: string[]) {
         pipeline.xAck(STREAM_NAME, consumerGroup, eventId);
     }
     await pipeline.exec();
+}
+
+// NEW: per-website enqueue lock
+export async function setEnqueueLock(websiteId: string, ttlMs: number): Promise<boolean> {
+  const key = `lock:enqueue:${websiteId}`;
+  const res = await client.set(key, "1", { NX: true, PX: ttlMs });
+  return res === "OK"; // true only if lock acquired
+}
+
+// NEW: enqueue a website only once within TTL
+export async function tryEnqueueOnce(event: WebsiteEvent, ttlMs: number): Promise<boolean> {
+  // Try to set lock
+  const locked = await setEnqueueLock(event.id, ttlMs);
+  if (!locked) {
+    // lock already exists -> skip enqueue
+    return false;
+  }
+
+  // Lock acquired -> enqueue job
+  await xAddBulk([event]);
+  return true;
 }

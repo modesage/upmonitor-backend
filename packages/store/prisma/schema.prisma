@@ -31,6 +31,7 @@ model website {
 
   // Index to speed up fetching all websites for a specific user
   @@index([user_id])
+  @@unique([user_id, url])
 }
 
 model region {

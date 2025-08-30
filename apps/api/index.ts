@@ -1,7 +1,5 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '../../.env' })
-
 import { prismaClient } from "store/client";
+import { tryEnqueueOnce } from "redisstream/client";
 import { AuthInput } from "./types";
 import { authMiddleware } from "./middleware";
 import jwt from "jsonwebtoken";
@@ -20,8 +18,8 @@ app.use(cors({
 
 app.get("/healthcheck", (req, res) => {
     res.status(200).json({
-        message: "Backend is running",
         status: "ok",
+        service: "backend api",
         uptime: process.uptime(),
         timestamp: new Date().toLocaleString()
     });
@@ -99,6 +97,9 @@ app.post("/website", authMiddleware, async (req, res) => {
             user_id: req.userId!
         }
     })
+
+     // Enqueue immediately (first check)
+    await tryEnqueueOnce({ id: website.id, url: website.url }, 10 * 60 * 1000);
 
     res.json({
         id: website.id

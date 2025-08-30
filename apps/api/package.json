@@ -23,6 +23,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "store": "workspace:*",
+    "redisstream": "workspace:*",
     "zod": "^4.0.15"
   }
 }
