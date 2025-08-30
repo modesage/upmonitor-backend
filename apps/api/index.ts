@@ -99,7 +99,7 @@ app.post("/website", authMiddleware, async (req, res) => {
     })
 
      // Enqueue immediately (first check)
-    await tryEnqueueOnce({ id: website.id, url: website.url }, 10 * 60 * 1000);
+    await tryEnqueueOnce({ id: website.id, url: website.url }, 30 * 1000);
 
     res.json({
         id: website.id
