@@ -64,7 +64,7 @@ async function runOneCycle() {
 
 // Option A: stateless endpoint called by Render Cron every minute
 const app = express();
-const PORT = process.env.PORT_PUSHER || 3001;
+const PORT = process.env.PORT || 3001;
 
 app.get("/", (req, res) => {
   res.status(200).send("Landing Page");

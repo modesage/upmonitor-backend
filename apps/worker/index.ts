@@ -63,7 +63,7 @@ async function runOneCycle() {
 
 // Express server
 const app = express();
-const PORT = process.env.PORT_WORKER || 3002;
+const PORT = process.env.PORT || 3002;
 
 app.get("/", (req, res) => {
   res.status(200).send("Landing Page");
