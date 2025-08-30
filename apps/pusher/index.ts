@@ -2,11 +2,11 @@ import { prismaClient } from "store/client";
 import { xAddBulk, setEnqueueLock } from "redisstream/client"; // new helper
 import express from "express";
 
-const CHECK_INTERVAL_MS = 10 * 60 * 1000;
+const CHECK_INTERVAL_MS = 30 * 1000;
 
 async function runOneCycle() {
   console.log("[Pusher] Checking websites...");
-  const tenMinutesAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
+  const thirtySecondsAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
 
   // only consider latest tick
   const websites = await prismaClient.website.findMany({
@@ -16,7 +16,7 @@ async function runOneCycle() {
         {
           ticks: {
             some: {
-              createdAt: { lt: tenMinutesAgo },
+              createdAt: { lt: thirtySecondsAgo },
             },
           },
         },
@@ -37,7 +37,7 @@ async function runOneCycle() {
   const dueWebsites = websites.filter(
     (w) =>
       w.ticks.length === 0 || // never checked before
-      w.ticks[0]!.createdAt < tenMinutesAgo // latest check too old
+      w.ticks[0]!.createdAt <= thirtySecondsAgo // latest check too old
   );
 
   if (dueWebsites.length === 0) {
