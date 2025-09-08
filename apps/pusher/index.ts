@@ -12,23 +12,22 @@ async function runOneCycle() {
 
   const thirtySecondsAgo = new Date(Date.now() - CHECK_INTERVAL_MS);
 
-  // Fetch all websites and their latest tick
-  const websites = await prismaClient.website.findMany({
+  // OPTIMIZED: Fetch only the websites that are due for a check,
+  // letting the database do the heavy lifting.
+  const dueWebsites = await prismaClient.website.findMany({
+    where: {
+      ticks: {
+        none: {
+          createdAt: {
+            gt: thirtySecondsAgo, // Find websites with NO ticks newer than thirtySecondsAgo
+          },
+        },
+      },
+    },
     select: {
       id: true,
       url: true,
-      ticks: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { createdAt: true },
-      },
     },
-  });
-
-  // Filter websites that are due for a check
-  const dueWebsites = websites.filter((w) => {
-    if (w.ticks.length === 0) return true; // never checked
-    return w.ticks[0]!.createdAt <= thirtySecondsAgo; // latest check too old
   });
 
   if (dueWebsites.length === 0) {
