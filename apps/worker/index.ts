@@ -20,23 +20,12 @@ consumerGroupExists();
 
 async function fetchWebsite(url: string, websiteId: string) {
   const start = Date.now();
-
-  // Verify website exists before recording a tick
-  const website = await prismaClient.website.findUnique({
-    where: { id: websiteId },
-    select: { id: true },
-  });
-
-  if (!website) {
-    console.warn(`[Worker] Skipping job — Website ${websiteId} not found.`);
-    return;
-  }
-
   try {
-    // Measure response time with HEAD request
+    // Make the HTTP request first
     await axios.head(url, { timeout: 10_000, maxRedirects: 5, validateStatus: () => true });
     const end = Date.now();
 
+    // Now attempt to create the 'Up' tick directly
     await prismaClient.website_tick.create({
       data: {
         response_time_ms: end - start,
@@ -45,23 +34,29 @@ async function fetchWebsite(url: string, websiteId: string) {
         website_id: websiteId,
       },
     });
-  } catch {
+  } catch (err: any) {
     const end = Date.now();
-    try {
-      await prismaClient.website_tick.create({
-        data: {
-          response_time_ms: end - start,
-          status: "Down",
-          region_id: REGION_ID,
-          website_id: websiteId,
-        },
-      });
-    } catch (err: any) {
-      // Handle case where website was deleted after existence check but before tick insert
-      if (err.code === "P2003") {
-        console.warn(`[Worker] Skipped saving tick — Website ${websiteId} deleted during request.`);
-      } else {
-        throw err;
+    // Check if the error is from Prisma (e.g., website deleted) or axios
+    if (err.code === "P2003") { // Prisma foreign key constraint failed
+      console.warn(`[Worker] Skipped saving tick — Website ${websiteId} was deleted.`);
+    } else {
+      // Assumes other errors are from axios (timeout, etc.) -> log a 'Down' tick
+      try {
+        await prismaClient.website_tick.create({
+          data: {
+            response_time_ms: end - start,
+            status: "Down",
+            region_id: REGION_ID,
+            website_id: websiteId,
+          },
+        });
+      } catch (finalErr: any) {
+         // This catch is for the rare case the site is deleted between the failed HEAD and this create
+         if (finalErr.code === "P2003") {
+            console.warn(`[Worker] Skipped saving tick — Website ${websiteId} was deleted.`);
+         } else {
+            console.error("[Worker] Failed to create 'Down' tick:", finalErr);
+         }
       }
     }
   }
